@@ -37,12 +37,19 @@ Always call the 'done' tool when you have finished your analysis.`
         execute: async ({ cmd }) => {
             const approvedCommands = ["npm", "curl", "wget", "python3", "python", "pip", "pip3", "node"]
 
+
+            if (!approvedCommands.some(approved => cmd.includes(approved))) {
+                throw new Error(`Command not allowed. Approved commands: ${approvedCommands.join(', ')}`)
+            }
+
             const run = exec(cmd)
 
             emit(`Run tool called command: ${cmd}`)
             return run
         }
     })
+
+    
 
     return {
         instructions: systemPrompt,
