@@ -38,10 +38,13 @@ export default function Repl({ dir }: Props) {
         setInput('')
         setBusy(true)
 
-        for await (const msg of session.askStream(q)) {
-            setMessages(m => [...m, msg])
+        try {
+            for await (const msg of session.askStream(q)) {
+                setMessages(m => [...m, msg])
+            }
+        } finally {
+            setBusy(false)
         }
-        setBusy(false)
     }
 
     return (
@@ -50,13 +53,13 @@ export default function Repl({ dir }: Props) {
             {messages.map((m, i) => (
                 <Text key={i}>
                     {m.type === 'tool' ? (
-                        <Text color="magenta">• {m.text}</Text>
+                        <Text color="magenta">• {m.text.trim()}</Text>
                     ) : m.type === 'user' ? (
                         `> ${m.text}`
                     ) : m.type === 'reasoning' ? (
-                        <Text color="gray" italic>{m.text}</Text>
+                        <Text color="gray" italic>{m.text.trim()}</Text>
                     ) : (
-                        m.text // assistant
+                        m.text.trim() // assistant
                     )}
                 </Text>
             ))}

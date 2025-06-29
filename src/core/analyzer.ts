@@ -8,6 +8,7 @@ import chalk from 'chalk';
 import { useInput } from 'ink';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import { analyzers } from '../analyzers/index.js'
 //import { parsePDF } from '../utils/pdf-parser.js';
 config()
 
@@ -30,120 +31,12 @@ export default class AnalyzerSession {
     constructor(dir: string, model = "gpt-4.1-mini") {
         this.dir = dir;
         const files = fs.readdirSync(this.dir);
-        const systemPrompt = fs.readFileSync(`${this.dir}/PROMPT.txt`).toString();
-        this.systemPrompt = systemPrompt;
+        // Load analyzer config (tools and instructions) from the basic analyzer
+        const analyzerConfig = analyzers.basic(this.dir, this.emitToolMessage.bind(this));
+        this.tools = analyzerConfig.tools;
+        this.systemPrompt = analyzerConfig.instructions;
         this.context = { dir: this.dir, files };
-
-        const getAllFiles = (directory: string, base = directory): string[] => {
-            const entries = fs.readdirSync(directory, { withFileTypes: true });
-            let results: string[] = [];
-
-            // Directories to ignore
-            const ignoreDirs = [
-                'node_modules', '.next', '.git', 'dist', 'build', 
-                '.cache', '.parcel-cache', '.turbo', 'coverage',
-                '.nyc_output', '.vscode', '.idea', 'target',
-                'bin', 'obj', '.vs', '__pycache__', '.pytest_cache'
-            ];
-
-            for (const entry of entries) {
-                const full = path.join(directory, entry.name);
-                if (entry.isDirectory()) {
-                    // Skip ignored directories
-                    if (!ignoreDirs.includes(entry.name)) {
-                        results = results.concat(getAllFiles(full, base));
-                    }
-                } else {
-                    results.push(path.relative(base, full));
-                }
-            }
-            return results;
-        };
-
-        const listFiles = tool({
-            name: 'list_files',
-            description: "List all the files in a certain directory",
-            parameters: z.object({ dir: z.string() }),
-            execute: async ({ dir }) => {
-                const items = fs.readdirSync(dir).join('\n');
-                this.toolMessages.push(`CLIThing read directory ${dir}`)
-                return items;
-            }
-        });
-
-        const listAllFiles = tool({
-            name: "list_all_files",
-            description: "Recursively list all files in every subdirectory of the current working directory",
-            parameters: z.object({}),
-            execute: async () => {
-                const items = getAllFiles(this.dir).join('\n');
-                this.toolMessages.push('CLIThing recursively read this directory')
-                return items;
-            }
-        });
-
-        const readFile = tool({
-            name: "read_file",
-            description: "Read the contents of a file in the current working directory",
-            parameters: z.object({ file: z.string() }),
-            execute: async ({ file }) => {
-                const full = path.join(this.dir, file);
-                if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-                    throw new Error('File not found.');
-                }
-                const read = fs.readFileSync(full, 'utf-8');     
-                this.toolMessages.push(`CLIThing read file ${file}`)       
-                return read;
-            },
-        });
-
-        const analyzeFile = tool({
-            name: "analyze_file",
-            description: "Analyze a non-text-based file, like an Excel spreadsheet or PDF.",
-            parameters: z.object({ file: z.string(), question: z.string().optional().nullable() }),
-            execute: async ({ file, question }) => {
-                const full = path.join(this.dir, file as string)
-                if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-                    throw new Error('File not found')
-                }
-
-                const ext = path.extname(full).toLowerCase()
-
-                try{
-                    if (ext === '.docx') {
-                        const result = await mammoth.extractRawText({ path: full })
-                        this.toolMessages.push(`CLIThing analyzed file ${file}`)
-                        return result.value
-                    } else if (['.xlsx', '.xls', '.csv'].includes(ext)) {
-                        const workbook = XLSX.readFile(full)
-                        const sheet = workbook.SheetNames[0];
-                        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheet])
-                        this.toolMessages.push(`CLIThing analyzed spreadsheet ${file}`)
-                        return csv
-                    } else if (ext === '.pdf') {
-                        const buffer = fs.readFileSync(full)
-                        //const text = await parsePDF(buffer.buffer)
-                        this.toolMessages.push(`CLIThing analyzed PDF ${file}`)
-                        return 'broken'
-                    } else {
-                        throw new Error('Unsupported file type')
-                    }
-                } catch(err: any) {
-                    return `Error analyzing file: ${err.message}`
-                }
-            }
-        })
-
-        const done = tool({
-            name: "done",
-            description: "Call this tool when you are done responding",
-            parameters: z.object({}),
-            execute: async () => {
-                this.running = false;
-            }
-        });
-
-        this.tools = [readFile, listFiles, listAllFiles, analyzeFile, done]
+        this.model = model;
         this.initializeAgent(model);
     }
 
@@ -175,7 +68,8 @@ export default class AnalyzerSession {
             const result = await run(this.agent, input, { context: this.context, stream: true });
 
             let buffer = '';
-            for await (const event of result.toStream()) {
+            let doneSignal = false;
+            outer: for await (const event of result.toStream()) {
                 if (event.type === 'raw_model_stream_event' && event.data.type === 'output_text_delta') {
                     const chunk = event.data.delta;
                     buffer += chunk;
@@ -195,17 +89,24 @@ export default class AnalyzerSession {
                     const msg = this.toolMessages.shift();
                     if (msg !== undefined) {
                         yield { text: msg, type: 'tool' };
+                        if (msg.trim().toLowerCase().includes('done')) {
+                            this.running = false;
+                            return; // Exit the generator immediately
+                        }
                     }
                 }
             }
+            // Flush any remaining buffer as a final assistant message
             if (buffer.length > 0) {
                 yield { text: buffer, type: 'assistant' };
             }
             await result.completed;
-            // (No need to yield tool messages here anymore)
             this.history = result.history as AgentInputItem[];
             if (result.finalOutput) {
                 turn = turn + 1;
+            }
+            if (this.running === false) {
+                break;
             }
         }
         this.running = false;
@@ -217,6 +118,10 @@ export default class AnalyzerSession {
             outputs.push(msg)
         }
         return outputs
+    }
+
+    emitToolMessage(msg: string) {
+        this.toolMessages.push(msg)
     }
 }
 
