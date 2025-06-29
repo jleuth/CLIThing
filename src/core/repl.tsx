@@ -10,11 +10,12 @@ type Message = ChatMessage | { text: string; type: 'user'}
 interface Props {
     dir: string
     model: string
+    analyzer: string
 }
 
-export default function Repl({ dir }: Props) {
+export default function Repl({ dir, model, analyzer }: Props) {
     const { exit } = useApp()
-    const [session] = useState(() => new AnalyzerSession(dir))
+    const [session] = useState(() => new AnalyzerSession(dir, model, analyzer))
     const [input, setInput] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
     const [busy, setBusy] = useState(false)

@@ -28,11 +28,15 @@ export default class AnalyzerSession {
     private tools: any[] = []
     private model!: string
 
-    constructor(dir: string, model = "gpt-4.1-mini") {
+    constructor(dir: string, model = "gpt-4.1-mini", analyzerType = "basic") {
         this.dir = dir;
         const files = fs.readdirSync(this.dir);
-        // Load analyzer config (tools and instructions) from the basic analyzer
-        const analyzerConfig = analyzers.basic(this.dir, this.emitToolMessage.bind(this));
+        // Load analyzer config (tools and instructions) from the specified analyzer
+        const analyzer = analyzers[analyzerType];
+        if (!analyzer) {
+            throw new Error(`Unknown analyzer: ${analyzerType}. Available analyzers: ${Object.keys(analyzers).join(', ')}`);
+        }
+        const analyzerConfig = analyzer(this.dir, this.emitToolMessage.bind(this));
         this.tools = analyzerConfig.tools;
         this.systemPrompt = analyzerConfig.instructions;
         this.context = { dir: this.dir, files };
