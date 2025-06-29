@@ -5,6 +5,13 @@ CLIThing uses OpenAI Agents and special purpose-build analyzing agents with doma
 
 CLIThing was built for power users, that's why it's extensible. Anyone can write an analyzer and PR/Fork CLIThing and set it up for themselves. Just pop in your OpenAI API key and you're ready.
 
+## Usage
+`clithing [options] <directory> [query (use this if you don't want interactive mode, just a one-off question)]`
+
+Avaliable options:
+ -m, --model | pick any availiable OpenAI model. Compatable with reasoning models as well, so if you're a masochist you can use o1-pro and pay $600/mTok out and $150/mTok in!
+ -a --analyzer | Pick an analyzer to get more focused results on tasks.
+
 ### Setup
 To set up CLIThing, pull the repository
 
@@ -37,3 +44,38 @@ Often times I find myself saying "WHY CAN'T A POWER USER JUST DO HIS THING??" wh
 
 ### Why not use Claude Code/Gemini CLI/OpenAI Codex?
 Technically, they work fine. However, they're meant for agentic coding/vibe coding, not general terminal use. The closest contender would be Gemini CLI, which does more general work, especially with it's high free usage limits. But IMO OpenAI still leads in model polish, so I wanted an OpenAI version.
+
+### How do I use a specific analyzer?
+To use a specific analyzer for a domain-specific task, you'll want to run "clithing -a <chosen analyzer> ." The currently availiable analyzers are:
+
+ -Basic (default)
+ -Code (for coding and code analysis)
+ -Config (Helps with configuration files, great for ricing a linux distro)
+ -Docs (Comb through documentation quickly)
+ -Env (Handle and set up environments faster)
+ -Logs (Comb through logs and find what you're looking for faster)
+
+Each one has domain-specific tools to help them in answering your questions.
+
+### How do I write my own analyzer?
+CLIThing is designed to be extensible, so you can write your own analyzer for your needs. An "analyzer" is just a small function that registers extra new tools with OpenAI Agents, change the allowed toolset, and changes the system prompt to whatever you need. 
+
+1. **Create a new file in src/analyzers with a useful name**
+2. **Write your analyzer**
+    ```ts
+        import { AnalyzerConfig } from "./index.js"
+        import { tools } from "@openai/agents"
+        import { readFile, listFiles, listAllFiles, analyzeFile, done } from "./basic.js" // if you want the full basic toolset. The only NECESSARY one is "done".
+        import { z } from "zod" // Highly recommended with OpenAI Agents tool definitions, doing all that JSON is confusing and no fun.
+    ```
+3. **Register your analyzer in src/analyzers/index.ts**
+To do this, just import it like `import { cookieAnalyzer } from "./cookies.ts"` and add it to AnalyzerFactory
+
+```ts
+export const analyzers: Record<string, AnalyzerFactory> = {
+    basic: createBasicAnalyzer,
+    cookie: cookieAnalyzer, // the key is what you want people to type when calling the analyzer "-a cookie", the value is whatever your export/import was called.
+}
+```
+
+4. **Run `npm run build` and that's it!***
