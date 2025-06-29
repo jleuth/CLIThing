@@ -9,8 +9,13 @@ program
     .name('clithing')
     .description('Analyze any file or directory with AI right in the command line.')
     .argument('<directory>', "Diretory to analyze in")
-    .action((directory: string) => {
-        analyzeDirectory(directory);
+    .argument('[question]', 'Run in non-interactive mode by supplying a single question')
+    .action((directory: string, question?: string) => {
+        if (question) {
+        analyzeDirectory(directory, question); //Non interactive mode
+        } else {
+            analyzeDirectory(directory) //Interactive mode
+        }
     })
 
 program.parse(process.argv)

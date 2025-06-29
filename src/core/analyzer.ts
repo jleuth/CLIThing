@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { config } from "dotenv"
 config()
 
-export default async function analyzeDirectory(dir: string) {
+export default async function analyzeDirectory(dir: string, question?: string) {
 
     const files = fs.readdirSync(dir)
     const context = { dir, files };
@@ -54,10 +54,10 @@ export default async function analyzeDirectory(dir: string) {
         name: "Directory analyzer",
         model: "gpt-4.1-mini", // Cheap model to test with
         instructions: `
-IMPORTANT: At the end of every task, you MUST call the "done" tool. If you do not, the program will hang and you will be stuck in an infinite loop. 
-Even if you only answer a question and do not use any other tools, you MUST call the "done" tool as your last action.
-Use your available tools through multiple turns to complete the user's task, then ALWAYS call "done" to finish.
-`,
+            IMPORTANT: At the end of every task, you MUST call the "done" tool. If you do not, the program will hang and you will be stuck in an infinite loop. 
+            Even if you only answer a question and do not use any other tools, you MUST call the "done" tool as your last action.
+            Use your available tools through multiple turns to complete the user's task, then ALWAYS call "done" to finish.
+        `,
         tools: [readFile, listFiles, done]
     })
 
@@ -66,16 +66,13 @@ Use your available tools through multiple turns to complete the user's task, the
 
     const ask = (q: string) => new Promise<string>(resolve => rl.question(q, resolve))
 
-    while (true) {
-        const userInput = (await ask('>')).trim()
-        if (userInput.toLowerCase() === 'exit') break;
-
-        // Set running to true when user hits enter (provides input)
+    const processInput = async (userInput: string) => {
         running = true
         let turn = 0
-        
+    
+
         while (running === true) {
-            if (turn > 10) {
+            if (turn >= 10) {
                 running = false
             }
 
@@ -91,6 +88,19 @@ Use your available tools through multiple turns to complete the user's task, the
         
         // Reset running to false after processing
         running = false
+    }
+
+    if (question) {
+        await processInput(question);
+        rl.close()
+        return
+    }
+
+    while (true) {
+        const userInput = (await ask('> ')).trim()
+            if (userInput.toLowerCase() === 'exit') break
+
+            await processInput(userInput)
     }
 
     rl.close()
