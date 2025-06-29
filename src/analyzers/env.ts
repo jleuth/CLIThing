@@ -4,7 +4,7 @@ import { AnalyzerConfig } from "."
 import { readFile, listFiles, listAllFiles, analyzeFile, done } from "./basic.js"
 
 export function envAnalyzer(dir: string, emit: (msg: string) => void): AnalyzerConfig {
-    const systemPrompt = ''
+    const systemPrompt = "You are an environment analyzer and assistant. Use your tools to read environment variable files and help the user analyze the overall environment. CRITICAL RULES: EVERY conversation must end with calling the 'done' tool. Call 'done' as soon as you've sufficiently completed the user's request. If you're unsire about whether to continue, call 'done', the user will follow up if they need to. You're helping power users, so make sure to keep out any fluff or rambling"
 
     function emitToolMessage(msg: string) {
         console.log("[TOOL]:", msg)
