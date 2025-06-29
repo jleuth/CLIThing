@@ -9,6 +9,7 @@ type Message = ChatMessage | { text: string; type: 'user'}
 
 interface Props {
     dir: string
+    model: string
 }
 
 export default function Repl({ dir }: Props) {
@@ -25,16 +26,27 @@ export default function Repl({ dir }: Props) {
             return
         }
 
+        if (q.startsWith(":model ")) {
+            const newModel = q.slice(7).trim()
+            session.setModel(newModel)
+            setMessages(m => [...m, { text: q, type: "user"}, { text: `Model set to ${newModel}`, type: 'assistant'}])
+            setInput('')
+            return
+        }
+
+        setMessages(m => [...m, { text: q, type: "user" }])
         setInput('')
         setBusy(true)
-        const outputs = await session.ask(q)
-        setMessages(m => [...m, { text: q, type: 'user' }, ...outputs])
+
+        for await (const msg of session.askStream(q)) {
+            setMessages(m => [...m, msg])
+        }
         setBusy(false)
     }
 
     return (
         <Box flexDirection="column">
-            <BigText text="CLIThing" font="tiny" />
+            <BigText text="CLIThing" font="3d" />
             {messages.map((m, i) => (
                 <Text key={i}>
                     {m.type === 'tool' && <Text color="magenta">• </Text>}

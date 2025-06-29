@@ -5,6 +5,7 @@ import * as readline from 'readline'
 import { z } from 'zod'
 import { config } from "dotenv"
 import chalk from 'chalk';
+import { useInput } from 'ink';
 config()
 
 export interface ChatMessage{
@@ -15,15 +16,19 @@ export interface ChatMessage{
 export default class AnalyzerSession {
     private history: AgentInputItem[] = [];
     private running = false;
-    private agent: Agent;
+    private agent!: Agent;
     private context: { dir: string; files: string[] };
     private dir: string;
     private toolMessages: string[] = []
+    private systemPrompt!: string
+    private tools: any[] = []
+    private model!: string
 
-    constructor(dir: string) {
+    constructor(dir: string, model = "gpt-4.1-mini") {
         this.dir = dir;
         const files = fs.readdirSync(this.dir);
         const systemPrompt = fs.readFileSync(`${this.dir}/PROMPT.txt`).toString();
+        this.systemPrompt = systemPrompt;
         this.context = { dir: this.dir, files };
 
         const getAllFiles = (directory: string, base = directory): string[] => {
@@ -98,40 +103,72 @@ export default class AnalyzerSession {
             }
         });
 
-        this.agent = new Agent({
-            name: "Directory analyzer",
-            model: "gpt-4.1-mini", // Cheap model to test with
-            instructions: systemPrompt,
-            tools: [readFile, listFiles, listAllFiles, done]
-        });
+        this.tools = [readFile, listFiles, listAllFiles, done]
+        this.initializeAgent(model);
     }
 
-     async ask(userInput: string): Promise<ChatMessage[]> {
-        this.running = true
-        let turn = 0
-        const outputs: ChatMessage[] = []
+    private initializeAgent(model: string) {
+        this.agent = new Agent({
+            name: "Directory analyzer",
+            model: model, // Cheap model to test with
+            instructions: this.systemPrompt,
+                tools: this.tools
+            });
+        }
+
+        setModel(model: string) {
+            this.initializeAgent(model)
+        }
+    
+
+     async *askStream(userInput: string): AsyncGenerator<ChatMessage> {
+        this.running = true;
+        let turn = 0;
+        //const outputs: ChatMessage[] = []
 
         while (this.running) {
             if (turn >= 10) { // Turn limit
-                this.running = false
+                this.running = false;
             }
-            const input: AgentInputItem[] = this.history.concat({ type: 'message', role: "user", content: userInput })
 
-            const result = await run(this.agent, input, { context: this.context })
+            const input: AgentInputItem[] = this.history.concat({ type: 'message', role: "user", content: userInput });
+            const result = await run(this.agent, input, { context: this.context, stream: true });
+
+            let buffer = '';
+            for await (const chunk of result.toTextStream()) {
+                buffer += chunk;
+                let newlineIndex;
+                while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                    const line = buffer.slice(0, newlineIndex + 1); // include the newline
+                    yield { text: line, type: 'assistant' };
+                    buffer = buffer.slice(newlineIndex + 1);
+                }
+            }
+            if (buffer.length > 0) {
+                yield { text: buffer, type: 'assistant' };
+            }
+            await result.completed;
 
             // Collect tool messages generated during this turn
             for (const msg of this.toolMessages) {
-                outputs.push({ text: msg, type: "tool"})
+                yield { text: msg, type: 'tool' };
             }
-            this.toolMessages = []
+            this.toolMessages = [];
 
+            this.history = result.history as AgentInputItem[];
             if (result.finalOutput) {
-                outputs.push({ text: result.finalOutput, type: 'assistant'});
                 turn = turn + 1;
             }
-            this.history = result.history as AgentInputItem[]
         }
-        this.running = false
-        return outputs;
+        this.running = false;
+    }
+
+    async ask(userInput: string): Promise<ChatMessage[]> {
+        const outputs: ChatMessage[] = []
+        for await (const msg of this.askStream(userInput)) {
+            outputs.push(msg)
+        }
+        return outputs
     }
 }
+
