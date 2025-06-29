@@ -10,11 +10,13 @@ import { codeAnalyzer } from './code.js'
 import { configAnalyzer } from './config.js'
 import { docsAnalyzer } from './docs.js'
 import { jsonAnalyzer } from './json.js'
+import { logAnalyzer } from './logs.js'
 
 export const analyzers: Record<string, AnalyzerFactory> = {
     basic: createBasicAnalyzer,
     code: codeAnalyzer,
     config: configAnalyzer,
     docs: docsAnalyzer,
-    json: jsonAnalyzer
+    json: jsonAnalyzer,
+    logs: logAnalyzer
 }
