@@ -2,6 +2,7 @@
 
 import { Command } from 'commander'
 import { render } from 'ink'
+import chalk from 'chalk'
 import Repl from './core/repl.js';
 import AnalyzerSession from './core/analyzer.js'
 
@@ -19,8 +20,10 @@ program
             const session = new AnalyzerSession(directory, model)
             for await (const msg of session.askStream(question)) {
                 if (msg.type === 'tool') {
-                    console.log(`* ${msg.text}`)
-                } else {
+                    process.stdout.write(`* ${msg.text}`)
+                } else if (msg.type === 'reasoning') {
+                    process.stdout.write(chalk.gray.italic(msg.text))
+                } else if (msg.type === 'assistant') {
                     process.stdout.write(msg.text)
                 }
             }

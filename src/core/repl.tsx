@@ -49,8 +49,15 @@ export default function Repl({ dir }: Props) {
             <BigText text="CLIThing" font="3d" />
             {messages.map((m, i) => (
                 <Text key={i}>
-                    {m.type === 'tool' && <Text color="magenta">• </Text>}
-                    {m.type === 'user' ? `> ${m.text}` : m.text}
+                    {m.type === 'tool' ? (
+                        <Text color="magenta">• {m.text}</Text>
+                    ) : m.type === 'user' ? (
+                        `> ${m.text}`
+                    ) : m.type === 'reasoning' ? (
+                        <Text color="gray" italic>{m.text}</Text>
+                    ) : (
+                        m.text // assistant
+                    )}
                 </Text>
             ))}
             {busy ? (

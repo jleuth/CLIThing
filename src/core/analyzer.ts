@@ -10,7 +10,7 @@ config()
 
 export interface ChatMessage{
     text: string
-    type: 'assistant' | 'tool'
+    type: 'assistant' | 'tool' | 'reasoning'
 }
 
 export default class AnalyzerSession {
@@ -135,26 +135,34 @@ export default class AnalyzerSession {
             const result = await run(this.agent, input, { context: this.context, stream: true });
 
             let buffer = '';
-            for await (const chunk of result.toTextStream()) {
-                buffer += chunk;
-                let newlineIndex;
-                while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-                    const line = buffer.slice(0, newlineIndex + 1); // include the newline
-                    yield { text: line, type: 'assistant' };
-                    buffer = buffer.slice(newlineIndex + 1);
+            for await (const event of result.toStream()) {
+                if (event.type === 'raw_model_stream_event' && event.data.type === 'output_text_delta') {
+                    const chunk = event.data.delta;
+                    buffer += chunk;
+                    let newlineIndex;
+                    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                        const line = buffer.slice(0, newlineIndex + 1);
+                        yield { text: line, type: 'assistant' };
+                        buffer = buffer.slice(newlineIndex + 1);
+                    }
+                } else if (event.type === 'run_item_stream_event' && event.item.type === 'reasoning_item') {
+                    const text = event.item.rawItem.content.map((c: any) => c.text).join(' ');
+                    const words = text.split(/\s+/).slice(0, 50).join(' ');
+                    yield { text: words, type: 'reasoning' };
+                }
+                // Stream tool messages as soon as they're added
+                while (this.toolMessages.length > 0) {
+                    const msg = this.toolMessages.shift();
+                    if (msg !== undefined) {
+                        yield { text: msg, type: 'tool' };
+                    }
                 }
             }
             if (buffer.length > 0) {
                 yield { text: buffer, type: 'assistant' };
             }
             await result.completed;
-
-            // Collect tool messages generated during this turn
-            for (const msg of this.toolMessages) {
-                yield { text: msg, type: 'tool' };
-            }
-            this.toolMessages = [];
-
+            // (No need to yield tool messages here anymore)
             this.history = result.history as AgentInputItem[];
             if (result.finalOutput) {
                 turn = turn + 1;
