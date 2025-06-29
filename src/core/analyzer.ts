@@ -6,6 +6,9 @@ import { z } from 'zod'
 import { config } from "dotenv"
 import chalk from 'chalk';
 import { useInput } from 'ink';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
+//import { parsePDF } from '../utils/pdf-parser.js';
 config()
 
 export interface ChatMessage{
@@ -94,6 +97,43 @@ export default class AnalyzerSession {
             },
         });
 
+        const analyzeFile = tool({
+            name: "analyze_file",
+            description: "Analyze a non-text-based file, like an Excel spreadsheet or PDF.",
+            parameters: z.object({ file: z.string(), question: z.string().optional().nullable() }),
+            execute: async ({ file, question }) => {
+                const full = path.join(this.dir, file as string)
+                if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
+                    throw new Error('File not found')
+                }
+
+                const ext = path.extname(full).toLowerCase()
+
+                try{
+                    if (ext === '.docx') {
+                        const result = await mammoth.extractRawText({ path: full })
+                        this.toolMessages.push(`CLIThing analyzed file ${file}`)
+                        return result.value
+                    } else if (['.xlsx', '.xls', '.csv'].includes(ext)) {
+                        const workbook = XLSX.readFile(full)
+                        const sheet = workbook.SheetNames[0];
+                        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheet])
+                        this.toolMessages.push(`CLIThing analyzed spreadsheet ${file}`)
+                        return csv
+                    } else if (ext === '.pdf') {
+                        const buffer = fs.readFileSync(full)
+                        //const text = await parsePDF(buffer.buffer)
+                        this.toolMessages.push(`CLIThing analyzed PDF ${file}`)
+                        return 'broken'
+                    } else {
+                        throw new Error('Unsupported file type')
+                    }
+                } catch(err: any) {
+                    return `Error analyzing file: ${err.message}`
+                }
+            }
+        })
+
         const done = tool({
             name: "done",
             description: "Call this tool when you are done responding",
@@ -103,7 +143,7 @@ export default class AnalyzerSession {
             }
         });
 
-        this.tools = [readFile, listFiles, listAllFiles, done]
+        this.tools = [readFile, listFiles, listAllFiles, analyzeFile, done]
         this.initializeAgent(model);
     }
 
