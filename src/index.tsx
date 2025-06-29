@@ -16,7 +16,13 @@ program
         if (question) { // Non interactive
             const session = new AnalyzerSession(directory)
             const outputs = await session.ask(question)
-            outputs.forEach((o: any) => console.log(o))
+            outputs.forEach((o: any) => {
+                if (o.type === 'tool') {
+                    console.log(`* ${o.text}`)
+                } else {
+                    console.log(o.text)
+                }
+            })
         } else { //Interactive
             render(<Repl dir={directory} />)
         }

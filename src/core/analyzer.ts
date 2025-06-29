@@ -7,12 +7,18 @@ import { config } from "dotenv"
 import chalk from 'chalk';
 config()
 
+export interface ChatMessage{
+    text: string
+    type: 'assistant' | 'tool'
+}
+
 export default class AnalyzerSession {
     private history: AgentInputItem[] = [];
     private running = false;
     private agent: Agent;
     private context: { dir: string; files: string[] };
     private dir: string;
+    private toolMessages: string[] = []
 
     constructor(dir: string) {
         this.dir = dir;
@@ -52,7 +58,7 @@ export default class AnalyzerSession {
             parameters: z.object({ dir: z.string() }),
             execute: async ({ dir }) => {
                 const items = fs.readdirSync(dir).join('\n');
-                console.log(chalk.blue("MODEL: listed a directory", items));
+                this.toolMessages.push(`CLIThing read directory ${dir}`)
                 return items;
             }
         });
@@ -63,7 +69,7 @@ export default class AnalyzerSession {
             parameters: z.object({}),
             execute: async () => {
                 const items = getAllFiles(this.dir).join('\n');
-                console.log(chalk.blue("MODEL: lists recursively:", items));
+                this.toolMessages.push('CLIThing recursively read this directory')
                 return items;
             }
         });
@@ -77,8 +83,8 @@ export default class AnalyzerSession {
                 if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
                     throw new Error('File not found.');
                 }
-                const read = fs.readFileSync(full, 'utf-8');
-                console.log(chalk.blue("MODEL: read file", read));
+                const read = fs.readFileSync(full, 'utf-8');     
+                this.toolMessages.push(`CLIThing read file ${file}`)       
                 return read;
             },
         });
@@ -88,7 +94,6 @@ export default class AnalyzerSession {
             description: "Call this tool when you are done responding",
             parameters: z.object({}),
             execute: async () => {
-                console.log(chalk.green("MODEL: called done"));
                 this.running = false;
             }
         });
@@ -101,19 +106,27 @@ export default class AnalyzerSession {
         });
     }
 
-     async ask(userInput: string): Promise<string[]> {
+     async ask(userInput: string): Promise<ChatMessage[]> {
         this.running = true
         let turn = 0
-        const outputs: string[] = []
+        const outputs: ChatMessage[] = []
 
         while (this.running) {
             if (turn >= 10) { // Turn limit
                 this.running = false
             }
             const input: AgentInputItem[] = this.history.concat({ type: 'message', role: "user", content: userInput })
+
             const result = await run(this.agent, input, { context: this.context })
+
+            // Collect tool messages generated during this turn
+            for (const msg of this.toolMessages) {
+                outputs.push({ text: msg, type: "tool"})
+            }
+            this.toolMessages = []
+
             if (result.finalOutput) {
-                outputs.push(result.finalOutput);
+                outputs.push({ text: result.finalOutput, type: 'assistant'});
                 turn = turn + 1;
             }
             this.history = result.history as AgentInputItem[]

@@ -3,7 +3,9 @@ import { Box, Text, useApp } from 'ink'
 import TextInput from "ink-text-input";
 import BigText from "ink-big-text";
 import Spinner from 'ink-spinner'
-import AnalyzerSession from "./analyzer.js";
+import AnalyzerSession, { ChatMessage } from "./analyzer.js";
+
+type Message = ChatMessage | { text: string; type: 'user'}
 
 interface Props {
     dir: string
@@ -13,7 +15,7 @@ export default function Repl({ dir }: Props) {
     const { exit } = useApp()
     const [session] = useState(() => new AnalyzerSession(dir))
     const [input, setInput] = useState('')
-    const [messages, setMessages] = useState<string[]>([])
+    const [messages, setMessages] = useState<Message[]>([])
     const [busy, setBusy] = useState(false)
 
     const handleSubmit = async () => {
@@ -26,7 +28,7 @@ export default function Repl({ dir }: Props) {
         setInput('')
         setBusy(true)
         const outputs = await session.ask(q)
-        setMessages(m => [...m, `> ${q}`, ...outputs])
+        setMessages(m => [...m, { text: q, type: 'user' }, ...outputs])
         setBusy(false)
     }
 
@@ -34,7 +36,10 @@ export default function Repl({ dir }: Props) {
         <Box flexDirection="column">
             <BigText text="CLIThing" font="tiny" />
             {messages.map((m, i) => (
-                <Text key={i}>{m}</Text>
+                <Text key={i}>
+                    {m.type === 'tool' && <Text color="magenta">• </Text>}
+                    {m.type === 'user' ? `> ${m.text}` : m.text}
+                </Text>
             ))}
             {busy ? (
                 <Text color="magenta"><Spinner type="dots" />Big think...</Text>
