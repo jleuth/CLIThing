@@ -1,14 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Agent, run, tool, AgentInputItem } from '@openai/agents';
+import { Agent, run, tool, AgentInputItem, system } from '@openai/agents';
 import * as readline from 'readline'
 import { z } from 'zod'
 import { config } from "dotenv"
+import chalk from 'chalk';
 config()
 
-export default async function analyzeDirectory(dir: string, question?: string) {
+export default async function analyzeDirectory(dir: string, question?: string) { // This analyzer doesn't go in the analyzers dir because it's the default one, /analyzers/ is for specialized analyzers
 
     const files = fs.readdirSync(dir)
+    const systemPrompt = fs.readFileSync(`${dir}/PROMPT.txt`).toString()
     const context = { dir, files };
 
     const getAllFiles = (directory: string, base = directory): string[] => { // This is different than list_files tool because this does it recursively
@@ -35,7 +37,7 @@ export default async function analyzeDirectory(dir: string, question?: string) {
         execute: async ({ dir }) => {
 
             const items = fs.readdirSync(dir).join('\n')
-            console.log(items)
+            console.log(chalk.blue("MODEL: listed a directory", items))
             return items
         }
     })
@@ -46,7 +48,7 @@ export default async function analyzeDirectory(dir: string, question?: string) {
         parameters: z.object({}),
         execute: async () => {
             const items = getAllFiles(dir).join('\n')
-            console.log("MODEL: lists recursively:", items)
+            console.log(chalk.blue("MODEL: lists recursively:", items))
             return items
         }
     })
@@ -62,7 +64,7 @@ export default async function analyzeDirectory(dir: string, question?: string) {
             }
 
             const read = fs.readFileSync(full, 'utf-8')
-            console.log("MODEL:", read)
+            console.log(chalk.blue("MODEL: read file", read))
             return read
         },
     })
@@ -72,7 +74,7 @@ export default async function analyzeDirectory(dir: string, question?: string) {
         description: "Call this tool when you are done responding",
         parameters: z.object({}),
         execute: async () => {
-            console.log("MODEL: called done")
+            console.log(chalk.green("MODEL: called done"))
             running = false
         }
     })
@@ -80,18 +82,14 @@ export default async function analyzeDirectory(dir: string, question?: string) {
     const agent = new Agent({
         name: "Directory analyzer",
         model: "gpt-4.1-mini", // Cheap model to test with
-        instructions: `
-            IMPORTANT: At the end of every task, you MUST call the "done" tool. If you do not, the program will hang and you will be stuck in an infinite loop. 
-            Even if you only answer a question and do not use any other tools, you MUST call the "done" tool as your last action.
-            Use your available tools through multiple turns to complete the user's task, then ALWAYS call "done" to finish.
-        `,
+        instructions: systemPrompt,
         tools: [readFile, listFiles, listAllFiles, done]
     })
 
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
     let history: AgentInputItem[] = [];
 
-    const ask = (q: string) => new Promise<string>(resolve => rl.question(q, resolve))
+    const ask = (q: string) => new Promise<string>(resolve => rl.question(chalk.yellow(q), resolve))
 
     const processInput = async (userInput: string) => {
         running = true
