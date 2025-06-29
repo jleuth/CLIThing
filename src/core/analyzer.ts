@@ -30,11 +30,11 @@ export default async function analyzeDirectory(dir: string, question?: string) {
 
     const listFiles = tool({
         name: 'list_files',
-        description: "List all the files in the current working directory",
-        parameters: z.object({ file: z.string() }),
-        execute: async () => {
+        description: "List all the files in a certain directory",
+        parameters: z.object({ dir: z.string() }),
+        execute: async ({ dir }) => {
 
-            const items = files.join('\n')
+            const items = fs.readdirSync(dir).join('\n')
             console.log(items)
             return items
         }
