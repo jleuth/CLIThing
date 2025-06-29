@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { AnalyzerConfig } from './index.js'
 
 // Helper for recursive file listing
-const getAllFiles = (directory: string, base = directory): string[] => {
+export const getAllFiles = (directory: string, base = directory): string[] => {
     const entries = fs.readdirSync(directory, { withFileTypes: true })
     let results: string[] = []
     const ignoreDirs = [
