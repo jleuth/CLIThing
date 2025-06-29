@@ -10,6 +10,22 @@ export default async function analyzeDirectory(dir: string, question?: string) {
 
     const files = fs.readdirSync(dir)
     const context = { dir, files };
+
+    const getAllFiles = (directory: string, base = directory): string[] => { // This is different than list_files tool because this does it recursively
+        const entries = fs.readdirSync(directory, { withFileTypes: true })
+        let results: string[] = []
+
+        for (const entry of entries) {
+            const full = path.join(directory, entry.name)
+            if (entry.isDirectory()) {
+                results = results.concat(getAllFiles(full, base))
+            } else {
+                results.push(path.relative(base, full))
+            }
+        }
+        return results
+    }
+
     let running = false
 
     const listFiles = tool({
@@ -20,6 +36,17 @@ export default async function analyzeDirectory(dir: string, question?: string) {
 
             const items = files.join('\n')
             console.log(items)
+            return items
+        }
+    })
+
+    const listAllFiles = tool({
+        name: "list_all_files",
+        description: "Recursively list all files in every subdirectory of the current working directory",
+        parameters: z.object({}),
+        execute: async () => {
+            const items = getAllFiles(dir).join('\n')
+            console.log("MODEL: lists recursively:", items)
             return items
         }
     })
@@ -58,7 +85,7 @@ export default async function analyzeDirectory(dir: string, question?: string) {
             Even if you only answer a question and do not use any other tools, you MUST call the "done" tool as your last action.
             Use your available tools through multiple turns to complete the user's task, then ALWAYS call "done" to finish.
         `,
-        tools: [readFile, listFiles, done]
+        tools: [readFile, listFiles, listAllFiles, done]
     })
 
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
