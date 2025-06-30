@@ -22,7 +22,7 @@ git pull https://github.com/jleuth/CLIThing.git && cd CLIThing
 
 Then build it with
 ```bash
-npm i && npm run build
+npm i && npm run build && npm link
 ```
 this should only take a few seconds
 
