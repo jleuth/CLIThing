@@ -12,6 +12,7 @@ import { docsAnalyzer } from './docs.js'
 import { jsonAnalyzer } from './json.js'
 import { logAnalyzer } from './logs.js'
 import { securityAnalyzer } from './security.js'
+import { webAnalyzer } from './web.js'
 
 export const analyzers: Record<string, AnalyzerFactory> = {
     basic: createBasicAnalyzer,
@@ -20,5 +21,6 @@ export const analyzers: Record<string, AnalyzerFactory> = {
     docs: docsAnalyzer,
     json: jsonAnalyzer,
     logs: logAnalyzer,
-    security: securityAnalyzer
+    security: securityAnalyzer,
+    web: webAnalyzer
 }
