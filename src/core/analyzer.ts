@@ -92,7 +92,7 @@ export default class AnalyzerSession {
         //const outputs: ChatMessage[] = []
 
         while (this.running) {
-            if (turn >= 10) { // Turn limit
+            if (turn >= 20) { // Turn limit
                 this.running = false;
             }
 
