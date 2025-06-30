@@ -10,7 +10,7 @@ import * as path from 'path'
 import { FileCache } from "../utils/cache.js";
 import OpenAI from "openai";
 import ProgressBar from 'ink-progress-bar'
-import { getRepoMetrics } from "@/utils/metrics.js";
+import { getRepoMetrics } from "../utils/metrics.js";
 
 const openai = new OpenAI();
 

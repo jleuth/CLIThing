@@ -9,7 +9,7 @@ import { useInput } from 'ink';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { analyzers } from '../analyzers/index.js'
-import { directoryDiff } from '@/utils/directoryDiff.js';
+import { directoryDiff } from '../utils/directoryDiff.js';
 //import { parsePDF } from '../utils/pdf-parser.js';
 config()
 

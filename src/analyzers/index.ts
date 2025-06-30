@@ -14,6 +14,7 @@ import { logAnalyzer } from './logs.js'
 import { securityAnalyzer } from './security.js'
 import { webAnalyzer } from './web.js'
 import { envAnalyzer } from './env.js'
+import { advancedFileAnalyzer } from './pipeline.js'
 
 export const analyzers: Record<string, AnalyzerFactory> = {
     basic: createBasicAnalyzer,
@@ -24,5 +25,6 @@ export const analyzers: Record<string, AnalyzerFactory> = {
     logs: logAnalyzer,
     security: securityAnalyzer,
     web: webAnalyzer,
-    env: envAnalyzer
+    env: envAnalyzer,
+    pipeline: advancedFileAnalyzer
 }
