@@ -138,6 +138,33 @@ export default function Repl({ dir, model, analyzer }: Props) {
             return
         }
 
+        if (q.startsWith(":deep-report")) {
+            const userQuery = q.slice(12).trim()
+            if (!userQuery) {
+                setMessages(m => [
+                    ...m,
+                    { text: q, type: "user" },
+                    { text: "Please provide a query or context after ':deep-report'.", type: "assistant" }
+                ])
+                setInput('')
+                return
+            }
+            setMessages(m => [...m, {text: q, type: "user"}])
+            setInput('')
+            setBusy(true)
+            try {
+                const prompt = `Provide a deep, comprehensive markdown report of this directory and its contents. Focus on structure, purpose, and notable issues or patterns. End with actionable recommendations.\n\nAdditional context or request: ${userQuery}`
+                const outputs = await session.ask(prompt)
+                const content = outputs.filter(o => o.type === 'assistant').map(o => o.text).join('');
+                const reportFile = 'deep-report.md';
+                fs.writeFileSync(path.resolve(reportFile), content, 'utf-8');
+                setMessages(m => [...m, {text: `Deep report saved to ${reportFile}`, type: "assistant"}]);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
+
         setMessages(m => [...m, { text: q, type: "user" }])
         setInput('')
         setBusy(true)
