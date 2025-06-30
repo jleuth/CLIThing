@@ -10,6 +10,7 @@ import * as path from 'path'
 import { FileCache } from "../utils/cache.js";
 import OpenAI from "openai";
 import ProgressBar from 'ink-progress-bar'
+import { getRepoMetrics } from "@/utils/metrics.js";
 
 const openai = new OpenAI();
 
@@ -154,6 +155,17 @@ export default function Repl({ dir, model, analyzer, compareDir }: Props) {
             const newModel = q.slice(7).trim()
             session.setModel(newModel)
             setMessages(m => [...m, { text: q, type: "user"}, { text: `Model set to ${newModel}`, type: 'assistant'}])
+            setInput('')
+            return
+        }
+
+        if (q.startsWith(":metrics")) {
+            const metrics = getRepoMetrics(dir)
+            const extSummary = Object.entries(metrics.linesByExt)
+                .map(([e, c]) => `${e}: ${c}`)
+                .join(', ')
+            const msg = `Files: ${metrics.fileCount}\nTotal lines: ${metrics.totalLines}\n${extSummary}`
+            setMessages(m => [...m, { text: q, type: 'user' }, { text: msg, type: 'assistant' }])
             setInput('')
             return
         }

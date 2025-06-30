@@ -7,6 +7,7 @@ import Repl from './core/repl.js';
 import AnalyzerSession from './core/analyzer.js'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getRepoMetrics } from './utils/metrics.js';
 
 const program = new Command();
 
@@ -14,6 +15,7 @@ program
     .name('clithing')
     .description('Analyze any file or directory with AI right in the command line.')
     .option('-m, --model <model>', "OpenAI model to use for this session", "gpt-4.1-mini")
+    .option('-M, --metrics', "Get quick metrics about your code and exit")
     .option('-a, --analyzer <analyzer>', "Analyzer to use (basic, code)", "basic")
     .option('-c, --compare <directory>', "Compare the target directory to another directory")
     .option('-d, --deep-report <question>', "Generate a full markdown report of a deep analysis on your question with a reasoning model. Note: Deep Report must be ran with a reasoning model.")
@@ -24,6 +26,14 @@ program
         const analyzer = opts.analyzer as string
         const compareDir = opts.compare as string
         const deepReportQuestion = opts.deepReport as string | undefined
+        const metricsFlag = opts.metrics as boolean
+
+        if (metricsFlag) {
+            const metrics = getRepoMetrics(directory)
+            console.log(JSON.stringify(metrics, null, 2))
+            return
+        }
+        
         if (deepReportQuestion) { // Deep report generation
             // Check if model is an o-series model (starts with 'o1' or 'o3', 'o4', 'o4-mini', etc)
             if (!/^o\d|^o\d?-?mini/i.test(model)) {
