@@ -1,9 +1,12 @@
-import React, { useState } from "react";
-import { Box, Text, useApp } from 'ink'
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp, useInput } from 'ink'
 import TextInput from "ink-text-input";
 import BigText from "ink-big-text";
 import Spinner from 'ink-spinner'
 import AnalyzerSession, { ChatMessage } from "./analyzer.js";
+import chokidar from 'chokidar'
+import * as fs from 'fs'
+import * as path from 'path'
 
 type Message = ChatMessage | { text: string; type: 'user'}
 
@@ -19,6 +22,120 @@ export default function Repl({ dir, model, analyzer }: Props) {
     const [input, setInput] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
     const [busy, setBusy] = useState(false)
+    const [autoAnalyze, setAutoAnalyze] = useState(false)
+
+    useInput((input, key) => {
+        if (key.shift && key.tab) { // shift + tab
+            setAutoAnalyze(a => {
+                const next = !a;
+                setMessages(m => [...m, { text: `Auto-analyze ${next ? 'enabled' : 'disabled'}`, type: 'assistant' }]);
+                return next;
+            });
+        }
+    })
+    
+    useEffect(() => {
+        if (!autoAnalyze) return
+
+        // Only detect file add/remove, or file changes >1KB
+        // Use a function for 'ignored' to ensure folders are ignored properly
+        const watcher = chokidar.watch(dir, {
+            ignored: (filePath: string) => {
+                // Normalize both dir and filePath
+                const rel = path.relative(path.resolve(dir), path.resolve(filePath)).replace(/\\/g, '/')
+                return (
+                    rel.startsWith('node_modules/') ||
+                    rel === 'node_modules' ||
+                    rel.startsWith('.git/') ||
+                    rel === '.git' ||
+                    rel.startsWith('dist/') ||
+                    rel === 'dist'
+                )
+            },
+            persistent: true,
+            ignoreInitial: true
+        })
+
+        // Handler for add/unlink events (always triggers)
+        const handleAddOrUnlink = async (file: string, type: 'add' | 'unlink') => {
+            setMessages(m => [
+                ...m,
+                { text: type === 'add' ? `File added: ${path.relative(dir, file)}` : `File removed: ${path.relative(dir, file)}`, type: 'assistant' }
+            ])
+            setBusy(true)
+            try {
+                for await (const msg of session.askStream(
+                    type === 'add'
+                        ? `A new file was added: ${file}. Provide some useful insights on the change.`
+                        : `A file was removed: ${file}. Provide some useful insights on the change.`
+                )) {
+                    setMessages(m => [...m, msg])
+                }
+            } finally {
+                setBusy(false)
+            }
+        }
+
+        // Handler for change events (only triggers if file size > 1KB)
+        const handleChange = async (file: string) => {
+            let size = 0
+            try {
+                size = fs.statSync(file).size
+            } catch {
+                return
+            }
+            if (size > 1024) {
+                // --- DIFF LOGIC START ---
+                let oldContent = ''
+                let newContent = ''
+                try {
+                    // Try to read previous content from a cache file
+                    const cachePath = file + '.clithingcache'
+                    if (fs.existsSync(cachePath)) {
+                        oldContent = fs.readFileSync(cachePath, 'utf8')
+                    }
+                    newContent = fs.readFileSync(file, 'utf8')
+                    // Save new content for next time
+                    fs.writeFileSync(cachePath, newContent, 'utf8')
+                } catch (e) {
+                    // If error, fallback to just reading new content
+                    newContent = fs.readFileSync(file, 'utf8')
+                }
+                // Compute diff
+                let diffText = ''
+                try {
+                    const diff = require('diff')
+                    diffText = diff.createPatch(path.basename(file), oldContent, newContent)
+                } catch (e) {
+                    diffText = '[Diff unavailable]'
+                }
+                // --- DIFF LOGIC END ---
+                setMessages(m => [
+                    ...m,
+                    { text: `Significant change detected in ${path.relative(dir, file)}`, type: 'assistant' }
+                ])
+                setBusy(true)
+                try {
+                    for await (const msg of session.askStream(
+                        `A significant change (over 1KB) occurred in ${file}. Here is the diff:\n\n${diffText}\n\nProvide some useful insights on the change.`
+                    )) {
+                        setMessages(m => [...m, msg])
+                    }
+                } finally {
+                    setBusy(false)
+                }
+            }
+        }
+
+        watcher.on('add', file => handleAddOrUnlink(file, 'add'))
+        watcher.on('unlink', file => handleAddOrUnlink(file, 'unlink'))
+        watcher.on('change', handleChange)
+
+        return () => {
+            watcher.close()
+        }
+    }, [autoAnalyze])
+    
 
     const handleSubmit = async () => {
         const q = input.trim()
@@ -51,6 +168,7 @@ export default function Repl({ dir, model, analyzer }: Props) {
     return (
         <Box flexDirection="column">
             <BigText text="CLIThing" font="3d" />
+            <Text color="cyan">Auto-analyze {autoAnalyze ? "ON" : "OFF"} (Shift+Tab)</Text>
             {messages.map((m, i) => (
                 <Text key={i}>
                     {m.type === 'tool' ? (
