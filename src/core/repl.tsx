@@ -8,6 +8,23 @@ import chokidar from 'chokidar'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FileCache } from "../utils/cache.js";
+import OpenAI from "openai";
+import ProgressBar from 'ink-progress-bar'
+
+const openai = new OpenAI();
+
+async function getLoadingMessage(query: string): Promise<string> {
+    try {
+        const res = await openai.responses.create({
+            model: 'gpt-4.1-nano',
+            input: `A 3-word silly loading message about cookies and related to query: ${query}. End with a statement, no punctuation.`
+        })
+
+        return res.output_text.concat("...") ?? "Thinking..."
+    } catch {
+        return "Thinking..."
+    }
+}
 
 type Message = ChatMessage | { text: string; type: 'user'}
 
@@ -25,6 +42,7 @@ export default function Repl({ dir, model, analyzer }: Props) {
     const [messages, setMessages] = useState<Message[]>([])
     const [busy, setBusy] = useState(false)
     const [autoAnalyze, setAutoAnalyze] = useState(false)
+    const [loadingMessage, setLoadingMessage] = useState("Thinking...")
 
     useInput((input, key) => {
         if (key.shift && key.tab) { // shift + tab
@@ -164,10 +182,12 @@ export default function Repl({ dir, model, analyzer }: Props) {
             }
             return;
         }
-
+        const lm = await getLoadingMessage(q)
+        setLoadingMessage(lm)
         setMessages(m => [...m, { text: q, type: "user" }])
         setInput('')
         setBusy(true)
+
 
         try {
             for await (const msg of session.askStream(q)) {
@@ -196,7 +216,7 @@ export default function Repl({ dir, model, analyzer }: Props) {
                 </Text>
             ))}
             {busy ? (
-                <Text color="magenta"><Spinner type="dots" />Big think...</Text>
+                <Text color="magenta"><Spinner type="dots" />{loadingMessage}</Text>
             ) : (
                 <Box>
                     <Text color="green">?</Text>
