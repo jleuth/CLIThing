@@ -9,7 +9,6 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { FileCache } from "../utils/cache.js";
 import OpenAI from "openai";
-import ProgressBar from 'ink-progress-bar'
 import { getRepoMetrics } from "../utils/metrics.js";
 
 const openai = new OpenAI();
@@ -35,6 +34,21 @@ interface Props {
     analyzer: string
     compareDir?: string
 }
+
+// Simple ESM-friendly progress bar to avoid ink-progress-bar's CommonJS/ESM conflict
+const ProgressBar: React.FC<{ percent: number | null }> = ({ percent }) => {
+    const width = 20; // characters wide
+    const pct = typeof percent === 'number' ? Math.max(0, Math.min(100, percent)) : 0;
+    const filled = Math.round((pct / 100) * width);
+    const empty = width - filled;
+    return (
+        <Box>
+            <Text color="green">{"█".repeat(filled)}</Text>
+            {empty > 0 && <Text color="gray">{"░".repeat(empty)}</Text>}
+            <Text> {pct.toFixed(0)}%</Text>
+        </Box>
+    );
+};
 
 export default function Repl({ dir, model, analyzer, compareDir }: Props) {
     const { exit } = useApp()

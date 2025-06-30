@@ -33,8 +33,10 @@
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.3.31",
     "react": "^19.1.0",
+    "tar-stream": "^3.1.7",
     "xlsx": "^0.18.5",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.0",
+    "yauzl": "^3.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.7",
