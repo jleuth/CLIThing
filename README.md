@@ -11,6 +11,7 @@ CLIThing was built for power users, that's why it's extensible. Anyone can write
 Avaliable options:
  -m, --model | pick any availiable OpenAI model. Compatable with reasoning models as well, so if you're a masochist you can use o1-pro and pay $600/mTok out and $150/mTok in!
  -a --analyzer | Pick an analyzer to get more focused results on tasks.
+ -d --deep-report <question> | Get a detailed markdown report on the current directory and any questions you have on it. NOTE: To use this, you must have the model flag set an o-series model.
 
 ### Setup
 To set up CLIThing, pull the repository
@@ -56,6 +57,9 @@ To use a specific analyzer for a domain-specific task, you'll want to run "clith
  -Logs (Comb through logs and find what you're looking for faster)
 
 Each one has domain-specific tools to help them in answering your questions.
+
+### Deep report mode
+To get an in-depth report on a question regarding your directory, you can run "clithing -m o3 -d What is going on in this project?" or ":model o3" ":deep-research What is going on in this project?", and it'll think harder before giving a response. You must use an o-series reasoning model in Deep Report mode. 
 
 ### How do I write my own analyzer?
 CLIThing is designed to be extensible, so you can write your own analyzer for your needs. An "analyzer" is just a small function that registers extra new tools with OpenAI Agents, change the allowed toolset, and changes the system prompt to whatever you need. 
