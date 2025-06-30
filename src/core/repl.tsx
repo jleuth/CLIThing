@@ -43,6 +43,7 @@ export default function Repl({ dir, model, analyzer }: Props) {
     const [busy, setBusy] = useState(false)
     const [autoAnalyze, setAutoAnalyze] = useState(false)
     const [loadingMessage, setLoadingMessage] = useState("Thinking...")
+    const [deepProgress, setDeepProgress] = useState<number | null>(null)
 
     useInput((input, key) => {
         if (key.shift && key.tab) { // shift + tab
@@ -170,6 +171,12 @@ export default function Repl({ dir, model, analyzer }: Props) {
             setMessages(m => [...m, {text: q, type: "user"}])
             setInput('')
             setBusy(true)
+            setDeepProgress(0)
+            const progressTimer = setInterval(() => {
+                setDeepProgress(p => p !== null && p < 0.95 ? p + 0.01 : p)
+            }, 500)
+            const lm = await getLoadingMessage(userQuery)
+            setLoadingMessage(lm)
             try {
                 const prompt = `Provide a deep, comprehensive markdown report of this directory and its contents. Focus on structure, purpose, and notable issues or patterns. End with actionable recommendations.\n\nAdditional context or request: ${userQuery}`
                 const outputs = await session.ask(prompt)
@@ -178,6 +185,8 @@ export default function Repl({ dir, model, analyzer }: Props) {
                 fs.writeFileSync(path.resolve(reportFile), content, 'utf-8');
                 setMessages(m => [...m, {text: `Deep report saved to ${reportFile}`, type: "assistant"}]);
             } finally {
+                clearInterval(progressTimer)
+                setDeepProgress(null)
                 setBusy(false);
             }
             return;
@@ -216,7 +225,14 @@ export default function Repl({ dir, model, analyzer }: Props) {
                 </Text>
             ))}
             {busy ? (
-                <Text color="magenta"><Spinner type="dots" />{loadingMessage}</Text>
+                deepProgress !== null ? (
+                    <Box>
+                        <Text color='magenta'>{loadingMessage} </Text>
+                        <ProgressBar percent={deepProgress} />
+                    </Box>
+                ) : (
+                    <Text color="magenta"><Spinner type="dots" />{loadingMessage}</Text>
+                )
             ) : (
                 <Box>
                     <Text color="green">?</Text>
