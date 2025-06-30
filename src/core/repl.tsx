@@ -159,6 +159,54 @@ export default function Repl({ dir, model, analyzer, compareDir }: Props) {
             return
         }
 
+        if (q.startsWith(":flag ")) {
+            const [name, state] = q.slice(6).trim().split(/\s+/)
+            if (!name) {
+                setMessages(m => [...m, { text: q, type: 'user' }, { text: "Usage: :flag <name> [on|off]", type: 'assistant' }])
+                setInput('')
+                return
+            }
+        }
+
+        if (q.startsWith(": flags")) {
+            const flags = session.getFlags().join(', ') || 'none'
+            setMessages(m => [...m, { text: q, type: 'user' }, { text: `Active flags: ${flags}`, type: 'assistant' }])
+            setInput('')
+            return
+        }
+
+        if (q === ":clear-flags") {
+            session.clearFlags()
+            setMessages(m => [...m, { text: q, type: 'user'}, { text: 'All flags cleared', type: 'assistant' }])
+            setInput('')
+            return
+        }
+
+        if (q === ":rules") {
+            const rules = session.getRules()
+            const list = rules.length ? rules.map((r, i) => `${r}`).join('\n') : 'none'
+            setMessages(m => [...m, { text: q, type: 'user' }, { text: `Rules:\n${list}`, type: 'assistant'}])
+            setInput('')
+            return
+        }
+
+        if (q === ":clear-rules") {
+            session.clearRules()
+            setMessages(m => [...m, { text: q, type: 'user'}, { text: 'All rules cleared', type: 'assistant'}])
+            setInput('')
+            return
+        }
+
+        if (q.startsWith(":rule ")) {
+            const ruleText = q.slice(6).trim()
+
+            if (!ruleText) {
+                setMessages(m => [...m, { text: q, type: 'user'}, { text: 'Rule added', type: 'assistant'}])
+                setInput('')
+                return
+            }
+        }
+
         if (q.startsWith(":metrics")) {
             const metrics = getRepoMetrics(dir)
             const extSummary = Object.entries(metrics.linesByExt)

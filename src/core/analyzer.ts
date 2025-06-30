@@ -25,9 +25,12 @@ export default class AnalyzerSession {
     private context: { dir: string; files: string[]; compareDir?: string; diff?: string };
     private dir: string;
     private toolMessages: string[] = []
+    private basePrompt!: string 
     private systemPrompt!: string
     private tools: any[] = []
     private model!: string
+    private flags = new Set<string>()
+    private rules: string[] = []
 
     constructor(dir: string, model = "gpt-4.1-mini", analyzerType = "basic", compareDir?: string) {
         this.dir = dir;
@@ -47,23 +50,36 @@ export default class AnalyzerSession {
         }
         const analyzerConfig = analyzer(this.dir, this.emitToolMessage.bind(this));
         this.tools = analyzerConfig.tools;
-        this.systemPrompt = analyzerConfig.instructions;
+        this.basePrompt = analyzerConfig.instructions;
         if (compareDir) {
-            this.systemPrompt += `\n\nA comparison directory is availiable at ${compareDir}. The diff between the directories is provided in the context under 'diff'. Use this to contrast them`
+            this.basePrompt += `\n\nA comparison directory is availiable at ${compareDir}. The diff between the directories is provided in the context under 'diff'. Use this to contrast them`
         }
         this.context = compareDir ? { dir: this.dir, files, compareDir, diff } : { dir: this.dir, files }
         this.model = model;
         this.initializeAgent(model);
     }
 
+    private buildPrompt(): string {
+        let prompt = this.basePrompt
+        if (this.flags.size > 0) {
+            prompt += '\n\nActive flags:\n' + [...this.flags].map(f => `-${f}`).join('\n')
+        }
+        if (this.rules.length > 0) {
+            prompt += '\n\nAdditional rules:\n' + this.rules.map(r => `-${r}`).join('\n')
+        }
+        return prompt
+    }
+
     private initializeAgent(model: string) {
+        this.systemPrompt = this.buildPrompt();
+        this.model = model;
         this.agent = new Agent({
             name: "Directory analyzer",
-            model: model, // Cheap model to test with
+            model,
             instructions: this.systemPrompt,
-                tools: this.tools
-            });
-        }
+            tools: this.tools
+        });
+    }
 
         setModel(model: string) {
             this.initializeAgent(model)
@@ -138,6 +154,37 @@ export default class AnalyzerSession {
 
     emitToolMessage(msg: string) {
         this.toolMessages.push(msg)
+    }
+
+    setFlag(name: string, value: boolean) {
+        if (value) {
+            this.flags.add(name)
+        } else {
+            this.flags.delete(name)
+        }
+    }
+
+    getFlags(): string[] {
+        return [...this.flags]
+    }
+
+    clearFlags() {
+        this.flags.clear()
+        this.initializeAgent(this.model)
+    }
+
+    addRule(rule: string) {
+        this.rules.push(rule)
+        this.initializeAgent(this.model)
+    }
+
+    clearRules() {
+        this.rules = []
+        this.initializeAgent(this.model)
+    }
+
+    getRules(): string[] {
+        return [...this.rules]
     }
 }
 

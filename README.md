@@ -61,6 +61,22 @@ Each one has domain-specific tools to help them in answering your questions.
 ### Deep report mode
 To get an in-depth report on a question regarding your directory, you can run "clithing -m o3 -d What is going on in this project?" or ":model o3" ":deep-research What is going on in this project?", and it'll think harder before giving a response. You must use an o-series reasoning model in Deep Report mode. 
 
+### Rules and Flags
+Inside the interactive environment you can control the model's behavior without needing to rewrite the system prompt with rules and flags.
+
+`:flag <name> [on|off]` - enable or disable a named flag
+`:flags` - list all active flags
+`:clear-flags` - remove all current flags
+`:rule <text>` - add an additional instruction to persist through your session
+`:rules` - show currently set rules
+`:clear-rules` - remove all custom rules
+
+#### Rules vs. Flags
+Rules are custom text-based instructions for the model. It's basically just adding your own stuff to the system prompt right in the interactive environent, no reload necessary. An example of this might be `:rule Always respond in Spanish`
+
+Flags are simple booleans to turn on or off certain pre-written aspects of CLIThing or an analyzer. They don't change the model's behavior past allowing/blocking certain things. A good example of this would be `:flag ARBITRARY_COMMAND_EXECUTION off`.
+
+
 ### How do I write my own analyzer?
 CLIThing is designed to be extensible, so you can write your own analyzer for your needs. An "analyzer" is just a small function that registers extra new tools with OpenAI Agents, change the allowed toolset, and changes the system prompt to whatever you need. 
 
