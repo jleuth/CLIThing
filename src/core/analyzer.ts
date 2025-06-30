@@ -9,6 +9,7 @@ import { useInput } from 'ink';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { analyzers } from '../analyzers/index.js'
+import { directoryDiff } from '@/utils/directoryDiff.js';
 //import { parsePDF } from '../utils/pdf-parser.js';
 config()
 
@@ -21,16 +22,24 @@ export default class AnalyzerSession {
     private history: AgentInputItem[] = [];
     private running = false;
     private agent!: Agent;
-    private context: { dir: string; files: string[] };
+    private context: { dir: string; files: string[]; compareDir?: string; diff?: string };
     private dir: string;
     private toolMessages: string[] = []
     private systemPrompt!: string
     private tools: any[] = []
     private model!: string
 
-    constructor(dir: string, model = "gpt-4.1-mini", analyzerType = "basic") {
+    constructor(dir: string, model = "gpt-4.1-mini", analyzerType = "basic", compareDir?: string) {
         this.dir = dir;
         const files = fs.readdirSync(this.dir);
+        let diff: string | undefined
+        if (compareDir) {
+            try {
+                diff = directoryDiff(dir, compareDir)
+            } catch {
+                diff = undefined
+            }
+        }
         // Load analyzer config (tools and instructions) from the specified analyzer
         const analyzer = analyzers[analyzerType];
         if (!analyzer) {
@@ -39,7 +48,10 @@ export default class AnalyzerSession {
         const analyzerConfig = analyzer(this.dir, this.emitToolMessage.bind(this));
         this.tools = analyzerConfig.tools;
         this.systemPrompt = analyzerConfig.instructions;
-        this.context = { dir: this.dir, files };
+        if (compareDir) {
+            this.systemPrompt += `\n\nA comparison directory is availiable at ${compareDir}. The diff between the directories is provided in the context under 'diff'. Use this to contrast them`
+        }
+        this.context = compareDir ? { dir: this.dir, files, compareDir, diff } : { dir: this.dir, files }
         this.model = model;
         this.initializeAgent(model);
     }

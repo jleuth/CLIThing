@@ -32,11 +32,12 @@ interface Props {
     dir: string
     model: string
     analyzer: string
+    compareDir?: string
 }
 
-export default function Repl({ dir, model, analyzer }: Props) {
+export default function Repl({ dir, model, analyzer, compareDir }: Props) {
     const { exit } = useApp()
-    const [session] = useState(() => new AnalyzerSession(dir, model, analyzer))
+    const [session] = useState(() => new AnalyzerSession(dir, model, analyzer, compareDir))
     const [cache] = useState(() => new FileCache(dir))
     const [input, setInput] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
