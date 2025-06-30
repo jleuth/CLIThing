@@ -7,6 +7,7 @@ import AnalyzerSession, { ChatMessage } from "./analyzer.js";
 import chokidar from 'chokidar'
 import * as fs from 'fs'
 import * as path from 'path'
+import { FileCache } from "../utils/cache.js";
 
 type Message = ChatMessage | { text: string; type: 'user'}
 
@@ -19,6 +20,7 @@ interface Props {
 export default function Repl({ dir, model, analyzer }: Props) {
     const { exit } = useApp()
     const [session] = useState(() => new AnalyzerSession(dir, model, analyzer))
+    const [cache] = useState(() => new FileCache(dir))
     const [input, setInput] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
     const [busy, setBusy] = useState(false)
@@ -58,6 +60,13 @@ export default function Repl({ dir, model, analyzer }: Props) {
 
         // Handler for add/unlink events (always triggers)
         const handleAddOrUnlink = async (file: string, type: 'add' | 'unlink') => {
+            if (!cache.isImportant(file)) return
+
+            if (type === 'unlink') {
+                cache.invalidate(file)
+            } else {
+                cache.computeDiff(file)
+            }
             setMessages(m => [
                 ...m,
                 { text: type === 'add' ? `File added: ${path.relative(dir, file)}` : `File removed: ${path.relative(dir, file)}`, type: 'assistant' }
@@ -84,32 +93,9 @@ export default function Repl({ dir, model, analyzer }: Props) {
             } catch {
                 return
             }
-            if (size > 1024) {
-                // --- DIFF LOGIC START ---
-                let oldContent = ''
-                let newContent = ''
-                try {
-                    // Try to read previous content from a cache file
-                    const cachePath = file + '.clithingcache'
-                    if (fs.existsSync(cachePath)) {
-                        oldContent = fs.readFileSync(cachePath, 'utf8')
-                    }
-                    newContent = fs.readFileSync(file, 'utf8')
-                    // Save new content for next time
-                    fs.writeFileSync(cachePath, newContent, 'utf8')
-                } catch (e) {
-                    // If error, fallback to just reading new content
-                    newContent = fs.readFileSync(file, 'utf8')
-                }
-                // Compute diff
-                let diffText = ''
-                try {
-                    const diff = require('diff')
-                    diffText = diff.createPatch(path.basename(file), oldContent, newContent)
-                } catch (e) {
-                    diffText = '[Diff unavailable]'
-                }
-                // --- DIFF LOGIC END ---
+            if (size > 1024 && cache.isImportant(file)) {
+                const diffText = cache.computeDiff(file) || ''
+            
                 setMessages(m => [
                     ...m,
                     { text: `Significant change detected in ${path.relative(dir, file)}`, type: 'assistant' }
