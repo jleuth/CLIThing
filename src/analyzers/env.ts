@@ -39,7 +39,12 @@ export function envAnalyzer(dir: string, emit: (msg: string) => void): AnalyzerC
     return {
         instructions: systemPrompt,
         tools: [
-            
+            readFileTool,
+            listFilesTool,
+            listAllFilesTool,
+            analyzeFileTool,
+            doneTool,
+            listEnv
         ]
     }
 }
